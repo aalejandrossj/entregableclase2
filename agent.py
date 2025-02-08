@@ -3,10 +3,15 @@ import re
 import math
 import json
 from dotenv import load_dotenv
-
 from groq import Groq
-
+from colorama import Fore
+from colorama import Style
 from tool import Tool
+from tool import validate_arguments
+from utils.completions import build_prompt_structure
+from utils.completions import ChatHistory
+from utils.completions import completions_create
+from utils.completions import update_chat_history
 from utils.extraction import extract_tag_content
 
 

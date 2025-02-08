@@ -1,9 +1,7 @@
 from tool import get_fn_signature
 from tool import validate_arguments
 from tool import tool
-from agent import REACT_SYSTEM_PROMPT
-from agent import MODEL
-from agent import GROQ_CLIENT
+from agent import ReactAgent
 from utils.extraction import extract_tag_content
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -110,38 +108,10 @@ def get_historic_data(moneda: str, fecha: str) -> dict:
     datos = scraper.obtener_precio()
     return datos
 
-print("Tool name: ", get_actual_data.name)
-print("Tool signature: ", get_actual_data.fn_signature)
+agent = ReactAgent(
+    model="llama-3.3-70b-versatile",
+    tools=[get_historic_data, get_actual_data]
+    )
 
-tools_signature = get_actual_data.fn_signature + ",\n" + get_historic_data.fn_signature + ",\n"
-
-REACT_SYSTEM_PROMPT = REACT_SYSTEM_PROMPT % tools_signature
-
-USER_QUESTION = "What was the price of solana on 21 January 2025"
-chat_history = [
-    {
-        "role": "system",
-        "content": REACT_SYSTEM_PROMPT
-    },
-    {
-        "role": "user",
-        "content": f"<question>{USER_QUESTION}</question>"
-    }
-]
-
-output = GROQ_CLIENT.chat.completions.create(
-    messages=chat_history,
-    model=MODEL
-).choices[0].message.content
-
-
-chat_history.append(
-    {
-        "role": "assistant",
-        "content": output
-    }
-)
-
-tool_call = extract_tag_content(output, tag="tool_call")
-
-print(tool_call)
+user_msg = "Dame datos de solana del dia 20 de enero de 2025"
+agent.run(user_msg)
