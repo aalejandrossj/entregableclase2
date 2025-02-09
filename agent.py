@@ -4,6 +4,7 @@ import math
 import json
 from dotenv import load_dotenv
 from groq import Groq
+from datetime import datetime
 from colorama import Fore
 from colorama import Style
 from tool import Tool
@@ -18,20 +19,25 @@ from utils.extraction import extract_tag_content
 # cargamos las variables de entorno, ahi debera estar nuestra API de Groq
 load_dotenv()
 
+fecha_actual = datetime.now()
+
+# Formatear la fecha como desees
+fecha_formateada = fecha_actual.strftime("%Y-%m-%d")  # Formato: Año-Mes-Día
+
 MODEL = "llama-3.3-70b-versatile"
 GROQ_CLIENT = Groq()
 
 BASE_SYSTEM_PROMPT = ""   
 
 # Define the System Prompt as a constant
-REACT_SYSTEM_PROMPT = """
+REACT_SYSTEM_PROMPT = f"""
 You are a function calling AI model. You operate by running a loop with the following steps: Thought, Action, Observation.
 You are provided with function signatures within <tools></tools> XML tags.
 You may call one or more functions to assist with the user query. Don't make assumptions about what values to plug into functions. Pay special attention to the properties 'types'. You should use those types as in a Python dict.
 
 For each function call return a JSON object with the function name and arguments within <tool_call></tool_call> XML tags as follows:
 
-<tool_call> {"name": <function-name>, "arguments": <args-dict>, "id": <monotonically-increasing-id>} </tool_call>
+<tool_call> {{"name": "<function-name>", "arguments": "<args-dict>", "id": "<monotonically-increasing-id>"}} </tool_call>
 
 Here are the available tools / actions:
 
@@ -40,11 +46,11 @@ Example session:
 
 <question>What is the current price of Solana?</question>
 <thought>I need to get the current price of solana</thought>
-<tool_call>{"name": "get_actual_data", "arguments": {"moneda": "solana"}, "id": 0}</tool_call>
+<tool_call>{{"name": "get_actual_data", "arguments": {{"moneda": "solana"}}, "id": 0}}</tool_call>
 
 You will be called again with this:
 
-<observation>{0: {"Precio": "$96,065.33"}}</observation>
+<observation>{{0: {{"Precio": "$96,065.33"}}}}</observation>
 
 You then output:
 
@@ -54,11 +60,18 @@ Example session 2:
 
 <question>What was the price of Ethereum on January 12, 2024?</question>
 <thought>I need to get the historical data for ethereum on January 12, 2024</thought>
-<tool_call>{"name": "get_historic_data", "arguments": {"moneda": "ethereum", "fecha": "Jan 12, 2024"}, "id": 0}</tool_call>
+<tool_call>{{"name": "get_historic_data", "arguments": {{"moneda": "ethereum", "fecha": "Jan 12, 2024"}}, "id": 0}}</tool_call>
+
+ALWAYS in the tool call, you need to put the data in this format, if the date is January 12, 2024, you put Jan 12, 2024.
+
+If the user requests data from a week ago, subtract the necessary days from this date: {fecha_formateada}. 
+Once adjusted, format it exactly as before. For example, if the current date is 09-02-2025, and they ask for data from a week ago, provide data for 02-02-2025 (Feb 02, 2025). 
+If they ask for data from a month ago and the date is 09-02-2025, provide 09-01-2025 (Jan 09, 2025). 
+Always ensure the date follows the same format.
 
 You will be called again with this:
 
-<observation>{0: {"Apertura": "$189.76", "Alza": "$203.15", "Baja": "$188.48", "MarketCap": "$93,740,476,812"}}</observation>
+<observation>{{0: {{"Apertura": "$189.76", "Alza": "$203.15", "Baja": "$188.48", "MarketCap": "$93,740,476,812"}}}}</observation>
 
 You then output:
 
@@ -68,6 +81,7 @@ Additional constraints:
 
 - If the user asks you something unrelated to any of the tools above, answer freely enclosing your answer with <response></response> tags.
 """
+
 
 class ReactAgent:
     """
