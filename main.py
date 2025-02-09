@@ -1,12 +1,17 @@
 from tool import tool
 from agent import ReactAgent
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+import math
+
 
 @tool
 def get_actual_data(moneda: str) -> dict:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.by import By
-    from webdriver_manager.chrome import ChromeDriverManager
+    
 
     class Scraper:
         def __init__(self, moneda: str):
@@ -38,13 +43,7 @@ def get_actual_data(moneda: str) -> dict:
 
 @tool
 def get_historic_data(moneda: str, fecha: str) -> dict:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from webdriver_manager.chrome import ChromeDriverManager
-
+    
     class Scraper:
         def __init__(self, moneda: str, fecha: str):
             self.moneda = moneda
@@ -81,10 +80,59 @@ def get_historic_data(moneda: str, fecha: str) -> dict:
 
     return Scraper(moneda, fecha).run()
 
+@tool
+def indicators_tool(moneda: str, fecha: str, Apertura: str, Alza: str, Baja: str, MarketCap: str):
+    """
+    Recibe los siguientes parámetros:
+      - moneda: str (ej. "USD")
+      - fecha: str (ej. "2025-02-09")
+      - Apertura: precio de apertura (ej. '$32.18')
+      - Alza: precio máximo del día (ej. '$32.56')
+      - Baja: precio mínimo del día (ej. '$26.42')
+      - MarketCap: capitalización de mercado (ej. '$11,353,366,736')
+      
+    Calcula y retorna un diccionario con:
+      - volatilidad: ((Alza - Baja) / Apertura) * 100
+      - potencial_ganancia: ((Alza - Apertura) / Apertura) * 100
+      - potencial_perdida: ((Apertura - Baja) / Apertura) * 100
+      - ratio_riesgo_beneficio: potencial_ganancia / potencial_perdida
+      - indice_riesgo_simple: volatilidad / ln(MarketCap)
+      
+    Además, se incluyen los parámetros 'moneda' y 'fecha' en el resultado.
+    """
+    # Función auxiliar para limpiar el valor y convertirlo a float
+    def limpiar_valor(valor_str):
+        return float(valor_str.replace('$', '').replace(',', ''))
+    
+    # Convertir los valores recibidos a números
+    apertura = limpiar_valor(Apertura)
+    alza = limpiar_valor(Alza)
+    baja = limpiar_valor(Baja)
+    marketcap = limpiar_valor(MarketCap)
+    
+    # Calcular indicadores
+    volatilidad = ((alza - baja) / apertura) * 100
+    potencial_ganancia = ((alza - apertura) / apertura) * 100
+    potencial_perdida = ((apertura - baja) / apertura) * 100
+    ratio_riesgo_beneficio = (potencial_ganancia / potencial_perdida) if potencial_perdida != 0 else None
+    indice_riesgo_simple = volatilidad / math.log(marketcap) if marketcap > 0 else None
+    
+    # Retornar los resultados junto con la moneda y la fecha
+    return {
+        'moneda': moneda,
+        'fecha': fecha,
+        'volatilidad': volatilidad,
+        'potencial_ganancia': potencial_ganancia,
+        'potencial_perdida': potencial_perdida,
+        'ratio_riesgo_beneficio': ratio_riesgo_beneficio,
+        'indice_riesgo_simple': indice_riesgo_simple
+    }
+
+
 
 agent = ReactAgent(
     model="llama-3.3-70b-versatile",
-    tools=[get_historic_data, get_actual_data]
+    tools=[get_historic_data, get_actual_data, indicators_tool]
 )
 
 if __name__ == "__main__":
